@@ -42,10 +42,20 @@
     const json = JSON.stringify(state);
     return { json, d: b64e(json), h: sig(json), t: t || Date.now() };
   }
-  function encodeSave(state, t) {
+    function encodeSave(state, t) {
     const o = buildSave(state, t);
-    return JSON.stringify({ f: 2, d: o.d, h: o.h, t: o.t });
+    // Format khớp với backupText() của game — phải có game/v/day để nút "Khôi phục dữ liệu" chấp nhận
+    return JSON.stringify({
+      game: 'ai-mua-xoi-di',
+      f: 2,
+      v: 'web-final',
+      day: state.day,
+      t: o.t,
+      d: o.d,
+      h: o.h
+    });
   }
+  
   function decodeSave(raw) {
     let o;
     try { o = typeof raw === 'string' ? JSON.parse(raw) : raw; }
