@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Công cụ Save — Tiệm Xôi Bà Tám</title>
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+
+<header class="site-header">
+  <h1>🛠️ Công cụ Save — Tiệm Xôi Bà Tám</h1>
+  <p class="sub">Giải mã · Chỉnh sửa · Ký lại · Tạo link chuyển dữ liệu</p>
+</header>
+
+<div class="warn">
+  ⚠️ <b>Sao lưu bản gốc trước khi sửa.</b> Copy save gốc ra Notepad trước khi ghi đè.
+</div>
+
+<main>
+  <section class="card">
+    <h2><span class="step">1</span> Dán dữ liệu</h2>
+    <p class="hint">
+      Chấp nhận save <code>{"f":2,"d":..,"h":..}</code>,
+      token <code>g.xxx</code>/<code>r.xxx</code>,
+      link <code>#xoi-transfer=…</code>, hoặc JSON state thô.
+    </p>
+
+    <div id="dropZone" class="drop-zone" tabindex="0" role="button" aria-label="Kéo thả file save vào đây">
+      <div class="drop-icon">📂</div>
+      <div class="drop-title">Kéo thả file save vào đây</div>
+      <div class="drop-sub">
+        hoặc <label for="filePicker" class="drop-link">chọn file từ máy</label>
+        · hoặc bôi đen text rồi thả vào đây
+        · hoặc dán vào ô bên dưới
+      </div>
+      <input id="filePicker" type="file"
+             accept=".json,.txt,application/json,text/plain" hidden>
+    </div>
+
+    <textarea id="input" spellcheck="false"
+      placeholder="Dán save / token / link vào đây..."></textarea>
+    <div class="btn-row">
+      <button id="btnDecode" class="primary">🔓 Giải mã</button>
+      <button id="btnLoadStorage">📥 Lấy từ localStorage</button>
+      <button id="btnClear">🧹 Xoá hết</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2><span class="step">2</span> Chỉnh sửa state</h2>
+    <div id="preview" class="preview"></div>
+    <details class="quick-edit" open>
+      <summary>✏️ Ô chỉnh nhanh (rời ô để áp dụng)</summary>
+      <div class="qe-grid">
+        <label>Ngày <input id="qe_day" type="number" min="1" step="1"></label>
+        <label>Tiền (đ) <input id="qe_money" type="number" min="0" step="1000"></label>
+        <label>Nợ (đ) <input id="qe_debt" type="number" min="0" step="1000"></label>
+        <label>Uy tín <input id="qe_rep" type="number" min="0" max="5" step="1"></label>
+        <label>Chương <input id="qe_chapter" type="number" min="1" max="5" step="1"></label>
+        <label>ch2 <input id="qe_ch2" type="number" min="0" max="1" step="1"></label>
+        <label>ch3 <input id="qe_ch3" type="number" min="0" max="1" step="1"></label>
+        <label>ch4 <input id="qe_ch4" type="number" min="0" max="1" step="1"></label>
+        <label>ch5 <input id="qe_ch5" type="number" min="0" max="1" step="1"></label>
+        <label>App rating <input id="qe_app" type="number" min="1" max="5" step="0.1"></label>
+        <label>Tổng phục vụ <input id="qe_totalServed" type="number" min="0" step="1"></label>
+        <label class="chk">freeMode <input id="qe_freeMode" type="checkbox"></label>
+        <label class="chk">dayDone <input id="qe_dayDone" type="checkbox"></label>
+      </div>
+      <div class="btn-row">
+        <button id="btnMaxMoney">💰 Max tiền</button>
+        <button id="btnClearDebt">🧾 Xoá nợ</button>
+        <button id="btnMaxRep">⭐ Max uy tín</button>
+      </div>
+    </details>
+    <label class="lbl">JSON state (sửa trực tiếp nếu muốn)</label>
+    <textarea id="state" spellcheck="false" placeholder="State JSON sẽ hiện sau khi giải mã..."></textarea>
+  </section>
+
+  <section class="card">
+    <h2><span class="step">3</span> Ký lại &amp; lấy save</h2>
+    <div class="btn-row">
+      <button id="btnSign" class="primary">✍️ Ký lại</button>
+      <button id="btnVerify">✅ Kiểm tra chữ ký</button>
+    </div>
+    <textarea id="output" spellcheck="false" placeholder="Save đã ký sẽ hiện ở đây..."></textarea>
+    <div class="btn-row">
+      <button id="btnCopySave">📋 Sao chép save</button>
+      <button id="btnDownloadSave">💾 Tải file .json</button>
+      <button id="btnWriteStorage">💽 Ghi vào localStorage trang này</button>
+    </div>
+    <p class="hint">Nút <b>Ghi localStorage</b> chỉ có tác dụng nếu tool mở <b>cùng origin</b> với game. Trên GitHub Pages, dùng <b>Sao chép save</b> rồi dán vào Console của game.</p>
+  </section>
+
+  <section class="card">
+    <h2><span class="step">4</span> Tạo link chuyển dữ liệu</h2>
+    <p class="hint">Link chứa fragment <code>#xoi-transfer=…</code> nên <b>không gửi lên máy chủ</b>.</p>
+    <label class="lbl">URL trang đích (trang final của game) — tuỳ chọn</label>
+    <input id="baseUrl" type="url" placeholder="https://example.com/game/index.html">
+    <div class="btn-row">
+      <button id="btnMakeLink" class="primary">🔗 Tạo link</button>
+      <button id="btnCopyLink">📋 Sao chép link</button>
+    </div>
+    <textarea id="linkOut" spellcheck="false" placeholder="Link chuyển dữ liệu sẽ hiện ở đây..."></textarea>
+  </section>
+
+  <section class="card">
+    <h2><span class="step">5</span> Hướng dẫn nhanh</h2>
+    <details>
+      <summary>📖 Lấy save từ trình duyệt</summary>
+      <ol>
+        <li>Mở game → <kbd>F12</kbd> → Console.</li>
+        <li>Chạy: <code>copy(localStorage.getItem('xoi_bt_save')||localStorage.getItem('xoi_bt_save_bak'))</code></li>
+        <li>Dán vào ô 1 của tool → <b>Giải mã</b>.</li>
+        <li>Sửa → <b>Ký lại</b> → <b>Sao chép save</b>.</li>
+        <li>Về Console game, chạy (thay <code>PASTE</code>):</li>
+      </ol>
+      <pre class="code">(function(){var v=PASTE;localStorage.setItem('xoi_bt_save',v);localStorage.setItem('xoi_bt_save_bak',v);localStorage.setItem('xoi_fmt','2');location.reload();})()</pre>
+    </details>
+    <details>
+      <summary>📂 Kéo thả file</summary>
+      <ul>
+        <li>Kéo file <code>.json</code> / <code>.txt</code> chứa save vào ô bước 1 → tự động giải mã.</li>
+        <li>Hoặc bôi đen save trong Notepad rồi kéo thả vào ô.</li>
+        <li>Click vào ô để mở hộp thoại chọn file.</li>
+      </ul>
+    </details>
+    <details>
+      <summary>🔐 Vì sao phải “Ký lại”?</summary>
+      <p>Save có <code>h</code> là hash của <code>d</code>. Sửa <code>d</code> mà không tính lại <code>h</code> → game coi save hỏng. Tool copy nguyên hàm hash từ game nên luôn khớp.</p>
+    </details>
+    <details>
+      <summary>❓ Lỗi thường gặp</summary>
+      <ul>
+        <li><b>“Chữ ký không khớp”</b> — bấm <b>Ký lại</b>.</li>
+        <li><b>Ghi localStorage xong game không đổi</b> — kiểm tra IndexedDB <code>xoi_bt</code> và <code>xoi_fmt='2'</code>.</li>
+      </ul>
+    </details>
+  </section>
+</main>
+
+<footer class="site-footer">
+  Tool tĩnh — không gửi dữ liệu đi đâu cả.
+</footer>
+
+<div id="toast" class="toast hidden"></div>
+
+<script src="./src/sig.js"></script>
+<script src="./src/codec.js"></script>
+<script src="./src/app.js"></script>
+</body>
+</html>
