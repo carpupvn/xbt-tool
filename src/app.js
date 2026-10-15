@@ -392,7 +392,13 @@
       } catch (e) { toast('JSON chưa hợp lệ.', 'bad'); }
     });
 
-    $('btnMaxMoney').addEventListener('click', () => { $('qe_money').value = 999999999; applyQuickEdit(); });
+    $('btnMaxMoney').addEventListener('click', () => {
+      const s = loadStateOrWarn(); if (!s) return;
+      safeSetMoney(s, 999999999);
+      saveState(s);
+      $('qe_money').value = 999999999;
+      toast('💰 Đã set 999.999.999đ và khớp ledger.', 'good');
+    });
     $('btnClearDebt').addEventListener('click', () => { $('qe_debt').value = 0; applyQuickEdit(); });
     $('btnMaxRep').addEventListener('click', () => { $('qe_rep').value = 5; applyQuickEdit(); });
 
