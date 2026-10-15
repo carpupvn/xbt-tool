@@ -50,6 +50,7 @@
   <section class="card">
     <h2><span class="step">2</span> Chỉnh sửa state</h2>
     <div id="preview" class="preview"></div>
+
     <details class="quick-edit" open>
       <summary>✏️ Ô chỉnh nhanh (rời ô để áp dụng)</summary>
       <div class="qe-grid">
@@ -73,6 +74,19 @@
         <button id="btnMaxRep">⭐ Max uy tín</button>
       </div>
     </details>
+
+    <details class="quick-edit" open>
+      <summary>🔓 Mở khoá (món xôi · nâng cấp · thành tựu)</summary>
+      <p class="hint">Bấm nút để áp dụng ngay vào state. Sau đó vẫn phải bấm <b>Ký lại</b> để lưu.</p>
+      <div class="btn-row">
+        <button id="btnUnlockAll" class="primary">🔓 Mở khoá tất cả</button>
+        <button id="btnUnlockDishes">🍚 Mở tất cả món xôi</button>
+        <button id="btnMaxUpg">⬆️ Max nâng cấp</button>
+        <button id="btnMaxAch">🏆 Full thành tựu</button>
+      </div>
+      <div id="dishList" class="dish-grid"></div>
+    </details>
+
     <label class="lbl">JSON state (sửa trực tiếp nếu muốn)</label>
     <textarea id="state" spellcheck="false" placeholder="State JSON sẽ hiện sau khi giải mã..."></textarea>
   </section>
@@ -126,6 +140,16 @@
       </ul>
     </details>
     <details>
+      <summary>🔓 Mở khoá</summary>
+      <ul>
+        <li><b>Mở khoá tất cả</b> — món xôi + nâng cấp + thành tựu + uy tín + rating + xoá nợ trong 1 nút.</li>
+        <li><b>Mở tất cả món xôi</b> — chỉ mở 24 món.</li>
+        <li><b>Max nâng cấp</b> — noi, la, ghe, loa, ti, tra lên cấp 5.</li>
+        <li><b>Full thành tựu</b> — mọi achievement hiện có trong save lên 999.</li>
+        <li>Hoặc tick từng món trong lưới checkbox bên dưới.</li>
+      </ul>
+    </details>
+    <details>
       <summary>🔐 Vì sao phải “Ký lại”?</summary>
       <p>Save có <code>h</code> là hash của <code>d</code>. Sửa <code>d</code> mà không tính lại <code>h</code> → game coi save hỏng. Tool copy nguyên hàm hash từ game nên luôn khớp.</p>
     </details>
@@ -133,6 +157,7 @@
       <summary>❓ Lỗi thường gặp</summary>
       <ul>
         <li><b>“Chữ ký không khớp”</b> — bấm <b>Ký lại</b>.</li>
+        <li><b>“Số tiền không khớp với sổ thu chi”</b> — game audit tổng <code>sum(ledger[i].net) === money</code>. Phải sửa entry cuối trong ledger khớp với <code>money</code>.</li>
         <li><b>Ghi localStorage xong game không đổi</b> — kiểm tra IndexedDB <code>xoi_bt</code> và <code>xoi_fmt='2'</code>.</li>
       </ul>
     </details>

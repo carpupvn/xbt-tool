@@ -16,6 +16,15 @@
   const $ = id => document.getElementById(id);
   const C = window.XoiCodec;
 
+  /* ---- Danh sách cố định ---- */
+  const FULL_DISHES = [
+    'doxanh','lac','gac','ladua','xeo','lacam','dauden','nepcam','mit','ga',
+    'san','bap','vo','com','khuc','thit','chuoi','xoai','saurieng','patecha',
+    'trungcut','lapxuong','thapcam','ngusac'
+  ];
+  const UPG_KEYS = ['noi','la','ghe','loa','ti','tra'];
+  const UPG_MAX = 5;
+
   let toastTimer = 0;
   function toast(msg, kind) {
     const t = $('toast');
@@ -40,6 +49,16 @@
     catch (e) { throw new Error('State JSON không hợp lệ: ' + e.message); }
     if (!s || typeof s !== 'object') throw new Error('State phải là object.');
     return s;
+  }
+  function loadStateOrWarn() {
+    try { return currentState(); }
+    catch (e) { toast('❌ ' + e.message, 'bad'); return null; }
+  }
+  function saveState(s) {
+    $('state').value = JSON.stringify(s, null, 2);
+    renderPreview(s);
+    refreshQuickEdit(s);
+    buildDishList(s);
   }
 
   function renderPreview(s) {
@@ -85,15 +104,63 @@
         else if (isFinite(n)) s[k] = n;
       }
     }
-    $('state').value = JSON.stringify(s, null, 2);
-    renderPreview(s);
+    saveState(s);
+  }
+
+  /* ---- Unlock helpers ---- */
+  function unlockDishes(s) {
+    s.unlocked = FULL_DISHES.slice();
+    return s;
+  }
+  function maxUpgrades(s) {
+    s.upg = s.upg || {};
+    for (const k of UPG_KEYS) s.upg[k] = UPG_MAX;
+    return s;
+  }
+  function maxAchievements(s) {
+    s.ach = s.ach || {};
+    for (const k of Object.keys(s.ach)) s.ach[k] = 999;
+    return s;
+  }
+  function unlockEverything(s) {
+    unlockDishes(s);
+    maxUpgrades(s);
+    maxAchievements(s);
+    s.rep = 5;
+    s.app = 5;
+    s.debt = 0;
+    return s;
+  }
+
+  /* ---- Checkbox list món xôi ---- */
+  function buildDishList(s) {
+    const box = $('dishList');
+    if (!box) return;
+    const has = new Set((s && Array.isArray(s.unlocked)) ? s.unlocked : []);
+    box.innerHTML = FULL_DISHES.map(id =>
+      `<label class="dish-item${has.has(id) ? ' on' : ''}">` +
+        `<input type="checkbox" data-dish="${id}"${has.has(id) ? ' checked' : ''}>` +
+        `<span>${id}</span>` +
+      `</label>`
+    ).join('');
+    box.querySelectorAll('input[type=checkbox]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const st = loadStateOrWarn();
+        if (!st) return;
+        const set = new Set(st.unlocked || []);
+        if (cb.checked) set.add(cb.dataset.dish);
+        else set.delete(cb.dataset.dish);
+        st.unlocked = FULL_DISHES.filter(d => set.has(d));
+        saveState(st);
+      });
+    });
   }
 
   async function onDecode() {
     try {
       const r = await C.decodeAny($('input').value);
       $('state').value = JSON.stringify(r.state, null, 2);
-      renderPreview(r.state); refreshQuickEdit(r.state);
+      renderPreview(r.state); refreshQuickEdit(r.state); buildDishList(r.state);
       const when = r.t ? new Date(r.t).toLocaleString('vi-VN') : '(không có t)';
       toast('✅ Giải mã OK (' + r.kind + '). Lưu lúc: ' + when, 'good');
       return true;
@@ -173,11 +240,11 @@
   }
   function onClear() {
     $('input').value = ''; $('state').value = ''; $('output').value = ''; $('linkOut').value = '';
-    renderPreview(null); refreshQuickEdit(null);
+    renderPreview(null); refreshQuickEdit(null); buildDishList(null);
     toast('🧹 Đã xoá hết.', '');
   }
 
-  /* ============ Drop zone / file picker ============ */
+  /* ---- Drop zone / file picker ---- */
   function setupDropZone() {
     const zone = $('dropZone');
     const picker = $('filePicker');
@@ -191,7 +258,6 @@
     zone.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); picker.click(); }
     });
-    // Await loadFile trước khi reset picker — tránh File object bị invalidate
     picker.addEventListener('change', async () => {
       const f = picker.files && picker.files[0];
       if (f) await loadFile(f);
@@ -243,7 +309,6 @@
     });
   }
 
-  // FileReader ổn định hơn file.text() trong iframe sandbox (VSCode Live Preview)
   function readFileAsText(file) {
     return new Promise((resolve, reject) => {
       const r = new FileReader();
@@ -277,7 +342,7 @@
     }
   }
 
-  /* ============ Bootstrap ============ */
+  /* ---- Bootstrap ---- */
   document.addEventListener('DOMContentLoaded', () => {
     $('btnDecode').addEventListener('click', onDecode);
     $('btnSign').addEventListener('click', onSign);
@@ -290,6 +355,29 @@
     $('btnLoadStorage').addEventListener('click', onLoadStorage);
     $('btnClear').addEventListener('click', onClear);
 
+    // Unlock buttons
+    $('btnUnlockDishes').addEventListener('click', () => {
+      const s = loadStateOrWarn(); if (!s) return;
+      unlockDishes(s); saveState(s);
+      toast('🍚 Đã mở tất cả ' + FULL_DISHES.length + ' món xôi.', 'good');
+    });
+    $('btnMaxUpg').addEventListener('click', () => {
+      const s = loadStateOrWarn(); if (!s) return;
+      maxUpgrades(s); saveState(s);
+      toast('⬆️ Đã max nâng cấp (cấp ' + UPG_MAX + ').', 'good');
+    });
+    $('btnMaxAch').addEventListener('click', () => {
+      const s = loadStateOrWarn(); if (!s) return;
+      maxAchievements(s); saveState(s);
+      toast('🏆 Đã full thành tựu.', 'good');
+    });
+    $('btnUnlockAll').addEventListener('click', () => {
+      const s = loadStateOrWarn(); if (!s) return;
+      unlockEverything(s); saveState(s);
+      toast('🔓 Đã mở khoá tất cả — bấm Ký lại để lưu.', 'good');
+    });
+
+    // Quick edit fields
     for (const id of Object.keys(QE)) {
       const el = $(id);
       if (el) el.addEventListener('change', applyQuickEdit);
@@ -300,7 +388,7 @@
     $('state').addEventListener('change', () => {
       try {
         const s = JSON.parse($('state').value);
-        refreshQuickEdit(s); renderPreview(s);
+        refreshQuickEdit(s); renderPreview(s); buildDishList(s);
       } catch (e) { toast('JSON chưa hợp lệ.', 'bad'); }
     });
 
@@ -311,5 +399,6 @@
     setupDropZone();
     renderPreview(null);
     refreshQuickEdit(null);
+    buildDishList(null);
   });
 })();
