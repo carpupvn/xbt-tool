@@ -1,4 +1,4 @@
-/* Form chỉnh sửa trực quan với tên tiếng Việt.
+/* Form chỉnh sửa trực quan với tên tiếng Việt + bulk actions.
    Phụ thuộc: XoiDict */
 (function (global) {
   'use strict';
@@ -8,6 +8,19 @@
   const esc = s => String(s).replace(/[&<>"']/g, c =>
     ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
   const fmtMoney = v => Math.round(v || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+
+  /* Giá gợi ý gốc của game (từ source: suggest field) */
+  const BASE_PRICES = {
+    doxanh: 15000, lac: 15000, gac: 20000, ladua: 15000, xeo: 20000,
+    lacam: 15000, dauden: 15000, nepcam: 20000, mit: 20000, ga: 30000,
+    san: 12000, bap: 15000, vo: 18000, com: 22000, khuc: 28000,
+    thit: 28000, chuoi: 18000, xoai: 25000, saurieng: 30000,
+    patecha: 30000, trungcut: 17000, lapxuong: 32000, thapcam: 50000, ngusac: 36000
+  };
+
+  /* Giá trị bulk input — giữ giữa các lần render */
+  let lastBulkPrice = 20000;
+  let lastBulkStock = 99;
 
   function toast(msg, kind) {
     const t = $('toast');
@@ -52,6 +65,48 @@
     bindEvents();
   }
 
+  /* ---------- Bulk action bars ---------- */
+  function bulkBarDishes() {
+    return `
+      <div class="bulk-bar">
+        <span class="bulk-lbl">💰 Set giá:</span>
+        <input type="number" id="bulkDishPrice" min="0" step="1000"
+               value="${lastBulkPrice}" placeholder="20000">
+        <button data-bulk="dish-price-unlocked" class="mini" type="button">Món đã mở</button>
+        <button data-bulk="dish-price-all" class="mini" type="button">Tất cả</button>
+        <button data-bulk="dish-price-reset" class="mini" type="button">Về giá gốc</button>
+      </div>`;
+  }
+  function bulkBarIngredients() {
+    return `
+      <div class="bulk-bar">
+        <span class="bulk-lbl">📦 Set kho:</span>
+        <input type="number" id="bulkStock" min="0" step="1"
+               value="${lastBulkStock}" placeholder="99">
+        <button data-bulk="stock-apply" class="mini" type="button">Áp dụng tất cả</button>
+        <button data-bulk="stock-max" class="mini" type="button">Max (99)</button>
+        <button data-bulk="stock-zero" class="mini" type="button">Về 0</button>
+      </div>`;
+  }
+  function bulkBarUpgrades() {
+    return `
+      <div class="bulk-bar">
+        <span class="bulk-lbl">⬆️ Nâng cấp:</span>
+        <button data-bulk="upg-max" class="mini" type="button">Max tất cả (5)</button>
+        <button data-bulk="upg-zero" class="mini" type="button">Về 0</button>
+      </div>`;
+  }
+  function bulkBarAchievements() {
+    return `
+      <div class="bulk-bar">
+        <span class="bulk-lbl">🏆 Thành tựu:</span>
+        <button data-bulk="ach-unlock" class="mini" type="button">Mở khoá (=1)</button>
+        <button data-bulk="ach-full" class="mini" type="button">Full (999)</button>
+        <button data-bulk="ach-zero" class="mini" type="button">Xoá hết</button>
+      </div>`;
+  }
+
+  /* ---------- Sections ---------- */
   function sectionDishes(s) {
     const unlocked = new Set(s.unlocked || []);
     const cooked = s.cooked || {};
@@ -76,7 +131,9 @@
           </label>
         </div>`;
     }).join('');
-    return detailsWrap('dish', '🍚 Món xôi', 'Bật/tắt món đã mở khoá · chỉnh giá · số phần đã nấu', rows);
+    return detailsWrap('dish', '🍚 Món xôi',
+      'Bật/tắt món đã mở khoá · chỉnh giá · số phần đã nấu',
+      bulkBarDishes() + rows);
   }
 
   function sectionIngredients(s) {
@@ -86,7 +143,9 @@
         <span>${esc(D.ING[k])}</span>
         <input type="number" min="0" step="1" data-stock="${k}" value="${stock[k] || 0}">
       </label>`).join('');
-    return detailsWrap('ing', '📦 Kho nguyên liệu', 'Số lượng trong kho (0 = hết)', `<div class="ing-grid">${rows}</div>`);
+    return detailsWrap('ing', '📦 Kho nguyên liệu',
+      'Số lượng trong kho (0 = hết)',
+      bulkBarIngredients() + `<div class="ing-grid">${rows}</div>`);
   }
 
   function sectionUpgrades(s) {
@@ -97,9 +156,9 @@
         <div class="upg-row">
           <b>${esc(D.UPG[k])}</b>
           <div class="upg-stepper">
-            <button data-upg-dec="${k}">−</button>
+            <button data-upg-dec="${k}" type="button">−</button>
             <input type="number" min="0" max="5" step="1" data-upg="${k}" value="${lv}">
-            <button data-upg-inc="${k}">+</button>
+            <button data-upg-inc="${k}" type="button">+</button>
           </div>
         </div>`;
     }).join('');
@@ -115,7 +174,9 @@
           return `<span class="stat-pill">${esc(D.STAT[k])}: <b>${display}</b></span>`;
         }).join('')}
       </div>`;
-    return detailsWrap('upg', '⬆️ Nâng cấp & Thống kê', 'Cấp đồ nghề (0-5) và số liệu tổng', rows + statsBox);
+    return detailsWrap('upg', '⬆️ Nâng cấp & Thống kê',
+      'Cấp đồ nghề (0-5) và số liệu tổng',
+      bulkBarUpgrades() + rows + statsBox);
   }
 
   function sectionAchievements(s) {
@@ -132,7 +193,9 @@
           <input type="number" min="0" step="1" data-ach="${k}" value="${v}">
         </div>`;
     }).join('');
-    return detailsWrap('ach', '🏆 Thành tựu', 'Mở khoá thành tựu (giá trị đặt >0)', `<div class="ach-grid">${rows}</div>`);
+    return detailsWrap('ach', '🏆 Thành tựu',
+      'Mở khoá thành tựu (giá trị đặt >0)',
+      bulkBarAchievements() + `<div class="ach-grid">${rows}</div>`);
   }
 
   function detailsWrap(id, title, hint, content) {
@@ -145,16 +208,126 @@
       </details>`;
   }
 
+  /* ============== Bulk handlers ============== */
+  function runBulk(action) {
+    // Lưu giá trị bulk trước khi re-render
+    const priceEl = $('bulkDishPrice');
+    if (priceEl) lastBulkPrice = parseInt(priceEl.value, 10) || 0;
+    const stockEl = $('bulkStock');
+    if (stockEl) lastBulkStock = parseInt(stockEl.value, 10) || 0;
+
+    let msg = '';
+    mutate(s => {
+      switch (action) {
+        /* ----- Món xôi ----- */
+        case 'dish-price-unlocked': {
+          s.prices = s.prices || {};
+          const list = s.unlocked || [];
+          list.forEach(k => { s.prices[k] = lastBulkPrice; });
+          msg = '💰 Đã set giá ' + fmtMoney(lastBulkPrice) + ' cho ' + list.length + ' món đã mở.';
+          break;
+        }
+        case 'dish-price-all': {
+          s.prices = s.prices || {};
+          Object.keys(D.DISH).forEach(k => { s.prices[k] = lastBulkPrice; });
+          msg = '💰 Đã set giá ' + fmtMoney(lastBulkPrice) + ' cho tất cả ' + Object.keys(D.DISH).length + ' món.';
+          break;
+        }
+        case 'dish-price-reset': {
+          s.prices = s.prices || {};
+          let n = 0;
+          Object.keys(BASE_PRICES).forEach(k => {
+            if (s.prices[k] !== BASE_PRICES[k]) { s.prices[k] = BASE_PRICES[k]; n++; }
+          });
+          msg = '↺ Đã reset ' + n + ' món về giá gốc của game.';
+          break;
+        }
+
+        /* ----- Kho ----- */
+        case 'stock-apply': {
+          s.stock = s.stock || {};
+          Object.keys(D.ING).forEach(k => { s.stock[k] = lastBulkStock; });
+          msg = '📦 Đã set kho = ' + lastBulkStock + ' cho tất cả ' + Object.keys(D.ING).length + ' loại.';
+          break;
+        }
+        case 'stock-max': {
+          s.stock = s.stock || {};
+          Object.keys(D.ING).forEach(k => { s.stock[k] = 99; });
+          msg = '📦 Đã set kho = 99 cho tất cả.';
+          break;
+        }
+        case 'stock-zero': {
+          s.stock = s.stock || {};
+          Object.keys(D.ING).forEach(k => { s.stock[k] = 0; });
+          msg = '📦 Đã xoá sạch kho.';
+          break;
+        }
+
+        /* ----- Nâng cấp ----- */
+        case 'upg-max': {
+          s.upg = s.upg || {};
+          Object.keys(D.UPG).forEach(k => { s.upg[k] = 5; });
+          msg = '⬆️ Đã max tất cả nâng cấp.';
+          break;
+        }
+        case 'upg-zero': {
+          s.upg = s.upg || {};
+          Object.keys(D.UPG).forEach(k => { s.upg[k] = 0; });
+          msg = '↺ Đã reset nâng cấp về 0.';
+          break;
+        }
+
+        /* ----- Thành tựu ----- */
+        case 'ach-unlock': {
+          s.ach = s.ach || {};
+          Object.keys(D.ACH).forEach(k => { s.ach[k] = 1; });
+          msg = '🏆 Đã mở khoá tất cả thành tựu (=1).';
+          break;
+        }
+        case 'ach-full': {
+          s.ach = s.ach || {};
+          Object.keys(D.ACH).forEach(k => { s.ach[k] = 999; });
+          msg = '🏆 Đã set tất cả thành tựu = 999.';
+          break;
+        }
+        case 'ach-zero': {
+          s.ach = s.ach || {};
+          Object.keys(D.ACH).forEach(k => { delete s.ach[k]; });
+          msg = '↺ Đã xoá hết thành tựu.';
+          break;
+        }
+      }
+    });
+    if (msg) toast(msg, 'good');
+    refresh();
+  }
+
   /* ============== Events ============== */
   function bindEvents() {
     const box = $('uiForm');
     if (!box) return;
 
+    /* Giữ expanded state */
     box.querySelectorAll('details.ui-sec').forEach(el => {
       el.addEventListener('toggle', () => { expanded[el.dataset.sec] = el.open; });
     });
 
-    // Unlocked checkbox
+    /* Lưu giá trị bulk input */
+    const bulkPrice = box.querySelector('#bulkDishPrice');
+    if (bulkPrice) bulkPrice.addEventListener('input', () => {
+      lastBulkPrice = parseInt(bulkPrice.value, 10) || 0;
+    });
+    const bulkStock = box.querySelector('#bulkStock');
+    if (bulkStock) bulkStock.addEventListener('input', () => {
+      lastBulkStock = parseInt(bulkStock.value, 10) || 0;
+    });
+
+    /* Bulk action buttons */
+    box.querySelectorAll('[data-bulk]').forEach(el => {
+      el.addEventListener('click', () => runBulk(el.dataset.bulk));
+    });
+
+    /* Unlocked checkbox */
     box.querySelectorAll('[data-dish]').forEach(el => {
       el.addEventListener('change', () => {
         const k = el.dataset.dish, on = el.checked;
@@ -167,7 +340,7 @@
       });
     });
 
-    // Giá bán
+    /* Giá bán */
     box.querySelectorAll('[data-price]').forEach(el => {
       el.addEventListener('change', () => {
         const k = el.dataset.price, v = parseInt(el.value, 10) || 0;
@@ -175,7 +348,7 @@
       });
     });
 
-    // Đã nấu
+    /* Đã nấu */
     box.querySelectorAll('[data-cooked]').forEach(el => {
       el.addEventListener('change', () => {
         const k = el.dataset.cooked, v = parseInt(el.value, 10) || 0;
@@ -186,7 +359,7 @@
       });
     });
 
-    // Kho nguyên liệu
+    /* Kho nguyên liệu */
     box.querySelectorAll('[data-stock]').forEach(el => {
       el.addEventListener('change', () => {
         const k = el.dataset.stock, v = parseInt(el.value, 10) || 0;
@@ -194,7 +367,7 @@
       });
     });
 
-    // Nâng cấp
+    /* Nâng cấp */
     box.querySelectorAll('[data-upg]').forEach(el => {
       el.addEventListener('change', () => {
         const k = el.dataset.upg, v = Math.max(0, Math.min(5, parseInt(el.value, 10) || 0));
@@ -223,7 +396,7 @@
       });
     });
 
-    // Thành tựu
+    /* Thành tựu */
     box.querySelectorAll('[data-ach]').forEach(el => {
       el.addEventListener('change', () => {
         const k = el.dataset.ach, v = Math.max(0, parseInt(el.value, 10) || 0);
