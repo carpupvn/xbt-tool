@@ -1,4 +1,4 @@
-/* UI & wiring. Phụ thuộc: XoiSig, XbtCodec, XoiCodec. */
+/* UI & wiring. Phụ thuộc: XoiSig, XbtCodec, XoiCodec, UIForm (tuỳ chọn). */
 (function () {
   'use strict';
 
@@ -6,8 +6,9 @@
     document.addEventListener('DOMContentLoaded', () => {
       document.body.insertAdjacentHTML('afterbegin',
         '<div style="background:#c02323;color:#fff;padding:14px;font:14px/1.5 system-ui">' +
-        '❌ Không load được <code>src/codec.js</code>. Kiểm tra đủ 3 file: ' +
-        '<code>src/sig.js</code>, <code>src/xbt.js</code>, <code>src/codec.js</code>, <code>src/app.js</code>.' +
+        '❌ Không load được <code>src/codec.js</code>. Kiểm tra đủ 5 file: ' +
+        '<code>src/sig.js</code>, <code>src/xbt.js</code>, <code>src/codec.js</code>, ' +
+        '<code>src/dict.js</code>, <code>src/ui-form.js</code>, <code>src/app.js</code>.' +
         '</div>');
     });
     return;
@@ -29,6 +30,7 @@
   // Nếu game vẫn bắt bất thường, giảm số này xuống (VD 50_000_000) rồi thử lại.
   const CAP_PER_DAY = 100_000_000;
   const AVG_TICKET = 25_000;   // giá trung bình 1 suất, dùng để ước lượng served
+
   let toastTimer = 0;
   function toast(msg, kind) {
     const t = $('toast');
@@ -171,6 +173,7 @@
     renderPreview(s);
     refreshQuickEdit(s);
     buildDishList(s);
+    if (window.UIForm) window.UIForm.refresh(s);
   }
 
   function renderPreview(s) {
@@ -270,7 +273,12 @@
     try {
       const r = await C.decodeAny($('input').value);
       $('state').value = JSON.stringify(r.state, null, 2);
-      renderPreview(r.state); refreshQuickEdit(r.state);
+      renderPreview(r.state); refreshQuickEdit(r.state); buildDishList(r.state);
+      if (window.UIForm) window.UIForm.refresh(r.state);
+
+      // Thông báo cho extras.js
+      window.dispatchEvent(new CustomEvent('xoi:decoded', { detail: { state: r.state } }));
+
       const when = r.t ? new Date(r.t).toLocaleString('vi-VN') : '(không có t)';
       toast('✅ Giải mã OK (' + r.kind + '). Lưu lúc: ' + when, 'good');
       return true;
@@ -292,10 +300,12 @@
         autoBalanceLedger(s, s.money);
         $('state').value = JSON.stringify(s, null, 2);
         renderPreview(s); refreshQuickEdit(s); buildDishList(s);
+        if (window.UIForm) window.UIForm.refresh(s);
         toast('🔧 Đã tự động cân bằng sổ sách trước khi ký.', '');
       }
 
       $('output').value = C.encodeSave(s);
+      window.dispatchEvent(new CustomEvent('xoi:signed'));
       toast('✅ Đã ký lại save JSON.', 'good');
     } catch (e) { toast('❌ ' + e.message, 'bad'); }
   }
@@ -307,16 +317,23 @@
       if (typeof s.day !== 'number' || s.day < 1)
         throw new Error('day phải là số >= 1.');
       $('output').value = C.encodeXbt(s);
+      window.dispatchEvent(new CustomEvent('xoi:signed'));
       toast('📱 Đã tạo mã XBT cho app — copy rồi dán vào game.', 'good');
     } catch (e) { toast('❌ ' + e.message, 'bad'); }
   }
 
-
   function onVerify() {
     const raw = ($('output').value || $('input').value || '').trim();
     if (!raw) return toast('Chưa có gì để kiểm tra.', 'bad');
-    try { const r = C.decodeSave(raw); toast('✅ Chữ ký hợp lệ. day=' + r.state.day, 'good'); }
-    catch (e) { toast('❌ ' + e.message, 'bad'); }
+    try {
+      if (raw.indexOf('XBT3') >= 0 && window.XbtCodec) {
+        const r = window.XbtCodec.decode(raw);
+        toast('✅ Mã XBT hợp lệ. day=' + r.state.day, 'good');
+        return;
+      }
+      const r = C.decodeSave(raw);
+      toast('✅ Chữ ký hợp lệ. day=' + r.state.day, 'good');
+    } catch (e) { toast('❌ ' + e.message, 'bad'); }
   }
 
   async function onCopySave() {
@@ -384,7 +401,12 @@
 
   function onClear() {
     $('input').value = ''; $('state').value = ''; $('output').value = ''; $('linkOut').value = '';
-    renderPreview(null); refreshQuickEdit(null);
+    renderPreview(null); refreshQuickEdit(null); buildDishList(null);
+    if (window.UIForm) window.UIForm.refresh(null);
+
+    // Thông báo cho extras.js
+    window.dispatchEvent(new CustomEvent('xoi:cleared'));
+
     toast('🧹 Đã xoá hết.', '');
   }
 
@@ -500,27 +522,29 @@
     $('btnLoadStorage').addEventListener('click', onLoadStorage);
     $('btnClear').addEventListener('click', onClear);
 
-    $('btnUnlockDishes').addEventListener('click', () => {
+    // Unlock buttons (chỉ bind nếu tồn tại trong DOM)
+    const bindIfExists = (id, fn) => { const el = $(id); if (el) el.addEventListener('click', fn); };
+
+    bindIfExists('btnUnlockDishes', () => {
       const s = loadStateOrWarn(); if (!s) return;
       unlockDishes(s); saveState(s);
       toast('🍚 Đã mở tất cả ' + FULL_DISHES.length + ' món xôi.', 'good');
     });
-    $('btnMaxUpg').addEventListener('click', () => {
+    bindIfExists('btnMaxUpg', () => {
       const s = loadStateOrWarn(); if (!s) return;
       maxUpgrades(s); saveState(s);
       toast('⬆️ Đã max nâng cấp.', 'good');
     });
-    $('btnMaxAch').addEventListener('click', () => {
+    bindIfExists('btnMaxAch', () => {
       const s = loadStateOrWarn(); if (!s) return;
       maxAchievements(s); saveState(s);
       toast('🏆 Đã full thành tựu.', 'good');
     });
-    $('btnUnlockAll').addEventListener('click', () => {
+    bindIfExists('btnUnlockAll', () => {
       const s = loadStateOrWarn(); if (!s) return;
       unlockEverything(s); saveState(s);
       toast('🔓 Đã mở khoá tất cả — bấm Ký lại để lưu.', 'good');
     });
-
 
     for (const id of Object.keys(QE)) {
       const el = $(id);
@@ -532,16 +556,18 @@
     $('state').addEventListener('change', () => {
       try {
         const s = JSON.parse($('state').value);
-        refreshQuickEdit(s); renderPreview(s);
+        refreshQuickEdit(s); renderPreview(s); buildDishList(s);
+        if (window.UIForm) window.UIForm.refresh(s);
       } catch (e) { toast('JSON chưa hợp lệ.', 'bad'); }
     });
 
-    $('btnMaxMoney').addEventListener('click', () => { $('qe_money').value = 999999999; applyQuickEdit(); });
-    $('btnClearDebt').addEventListener('click', () => { $('qe_debt').value = 0; applyQuickEdit(); });
-    $('btnMaxRep').addEventListener('click', () => { $('qe_rep').value = 5; applyQuickEdit(); });
+    bindIfExists('btnMaxMoney', () => { $('qe_money').value = 999999999; applyQuickEdit(); });
+    bindIfExists('btnClearDebt', () => { $('qe_debt').value = 0; applyQuickEdit(); });
+    bindIfExists('btnMaxRep', () => { $('qe_rep').value = 5; applyQuickEdit(); });
 
     setupDropZone();
     renderPreview(null);
     refreshQuickEdit(null);
+    if (window.UIForm) window.UIForm.refresh(null);
   });
 })();

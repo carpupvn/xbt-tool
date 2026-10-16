@@ -10,7 +10,7 @@
 
 <header class="site-header">
   <h1>🛠️ Công cụ Save — Tiệm Xôi Bà Tám</h1>
-  <p class="sub">Giải mã · Chỉnh sửa · Ký lại · Tạo link chuyển dữ liệu</p>
+  <p class="sub">Giải mã · Chỉnh sửa · Ký lại · Tạo mã XBT cho app</p>
 </header>
 
 <div class="warn">
@@ -18,10 +18,13 @@
 </div>
 
 <main>
+
+  <!-- ═══════════ BƯỚC 1: NHẬP DỮ LIỆU ═══════════ -->
   <section class="card">
     <h2><span class="step">1</span> Dán dữ liệu</h2>
     <p class="hint">
-      Chấp nhận save <code>{"f":2,"d":..,"h":..}</code>,
+      Chấp nhận: save JSON <code>{"f":2,"d":..}</code>,
+      mã XBT3 của app <code>XBT3...</code>,
       token <code>g.xxx</code>/<code>r.xxx</code>,
       link <code>#xoi-transfer=…</code>, hoặc JSON state thô.
     </p>
@@ -39,7 +42,7 @@
     </div>
 
     <textarea id="input" spellcheck="false"
-      placeholder="Dán save / token / link vào đây..."></textarea>
+      placeholder="Dán save / mã XBT3 / token / link vào đây..."></textarea>
     <div class="btn-row">
       <button id="btnDecode" class="primary">🔓 Giải mã</button>
       <button id="btnLoadStorage">📥 Lấy từ localStorage</button>
@@ -47,21 +50,32 @@
     </div>
   </section>
 
+  <!-- ═══════════ BƯỚC 2: CHỈNH SỬA ═══════════ -->
   <section class="card">
     <h2><span class="step">2</span> Chỉnh sửa state</h2>
     <div id="preview" class="preview"></div>
+    <div style="margin-bottom:12px;">
+      <span id="saveStatus" class="save-status">Chưa có state</span>
+    </div>
 
-    <details class="quick-edit" open>
-      <summary>✏️ Ô chỉnh nhanh (rời ô để áp dụng)</summary>
+    <!-- Form trực quan -->
+    <details class="quick-edit ui-form-wrap" open>
+      <summary>🎨 Bảng chỉnh sửa trực quan (tên tiếng Việt)</summary>
+      <div id="uiForm"></div>
+    </details>
+
+    <!-- Ô chỉnh nhanh cũ -->
+    <details class="quick-edit">
+      <summary>⚡ Ô chỉnh nhanh (day / money / chương...)</summary>
       <div class="qe-grid">
         <label>Ngày <input id="qe_day" type="number" min="1" step="1"></label>
         <label>Tiền (đ) <input id="qe_money" type="number" min="0" step="1000"></label>
         <label>Nợ (đ) <input id="qe_debt" type="number" min="0" step="1000"></label>
-        <label>Uy tín <input id="qe_rep" type="number" min="0" max="5" step="1"></label>
+        <label>Uy tín <input id="qe_rep" type="number" min="0" max="5" step="0.01"></label>
         <label>Chương <input id="qe_chapter" type="number" min="1" max="5" step="1"></label>
-        <label>ch2 <input id="qe_ch2" type="number" min="0" max="1" step="1"></label>
+        <label>ch2 <input id="qe_ch2" type="number" min="0" max="3" step="1"></label>
         <label>ch3 <input id="qe_ch3" type="number" min="0" max="1" step="1"></label>
-        <label>ch4 <input id="qe_ch4" type="number" min="0" max="1" step="1"></label>
+        <label>ch4 <input id="qe_ch4" type="number" min="0" max="2" step="1"></label>
         <label>ch5 <input id="qe_ch5" type="number" min="0" max="1" step="1"></label>
         <label>App rating <input id="qe_app" type="number" min="1" max="5" step="0.1"></label>
         <label>Tổng phục vụ <input id="qe_totalServed" type="number" min="0" step="1"></label>
@@ -75,22 +89,14 @@
       </div>
     </details>
 
-    <details class="quick-edit" open>
-      <summary>🔓 Mở khoá (món xôi · nâng cấp · thành tựu)</summary>
-      <p class="hint">Bấm nút để áp dụng ngay vào state. Sau đó vẫn phải bấm <b>Ký lại</b> để lưu.</p>
-      <div class="btn-row">
-        <button id="btnUnlockAll" class="primary">🔓 Mở khoá tất cả</button>
-        <button id="btnUnlockDishes">🍚 Mở tất cả món xôi</button>
-        <button id="btnMaxUpg">⬆️ Max nâng cấp</button>
-        <button id="btnMaxAch">🏆 Full thành tựu</button>
-      </div>
-      <div id="dishList" class="dish-grid"></div>
+    <!-- JSON thô -->
+    <details class="quick-edit json-wrap">
+      <summary>🧾 JSON thô (cho người rành kỹ thuật)</summary>
+      <textarea id="state" spellcheck="false" placeholder="State JSON sẽ hiện sau khi giải mã..."></textarea>
     </details>
-
-    <label class="lbl">JSON state (sửa trực tiếp nếu muốn)</label>
-    <textarea id="state" spellcheck="false" placeholder="State JSON sẽ hiện sau khi giải mã..."></textarea>
   </section>
 
+  <!-- ═══════════ BƯỚC 3: KÝ LẠI ═══════════ -->
   <section class="card">
     <h2><span class="step">3</span> Ký lại &amp; lấy save</h2>
     <div class="btn-row">
@@ -98,15 +104,19 @@
       <button id="btnMakeXbt">📱 Tạo mã XBT cho app</button>
       <button id="btnVerify">✅ Kiểm tra chữ ký</button>
     </div>
-    <textarea id="output" spellcheck="false" placeholder="Save đã ký sẽ hiện ở đây..."></textarea>
+    <textarea id="output" spellcheck="false" placeholder="Save / mã XBT đã ký sẽ hiện ở đây..."></textarea>
     <div class="btn-row">
-      <button id="btnCopySave">📋 Sao chép save</button>
+      <button id="btnCopySave">📋 Sao chép</button>
       <button id="btnDownloadSave">💾 Tải file .json</button>
       <button id="btnWriteStorage">💽 Ghi vào localStorage trang này</button>
     </div>
-    <p class="hint">Nút <b>Ghi localStorage</b> chỉ có tác dụng nếu tool mở <b>cùng origin</b> với game. Trên GitHub Pages, dùng <b>Sao chép save</b> rồi dán vào Console của game.</p>
+    <p class="hint">
+      Nút <b>Ghi localStorage</b> chỉ có tác dụng nếu tool mở <b>cùng origin</b> với game.
+      Trên GitHub Pages, dùng <b>Sao chép</b> rồi dán vào Console / ô "Khôi phục dữ liệu" của game.
+    </p>
   </section>
 
+  <!-- ═══════════ BƯỚC 4: LINK CHUYỂN ═══════════ -->
   <section class="card">
     <h2><span class="step">4</span> Tạo link chuyển dữ liệu</h2>
     <p class="hint">Link chứa fragment <code>#xoi-transfer=…</code> nên <b>không gửi lên máy chủ</b>.</p>
@@ -119,19 +129,33 @@
     <textarea id="linkOut" spellcheck="false" placeholder="Link chuyển dữ liệu sẽ hiện ở đây..."></textarea>
   </section>
 
+  <!-- ═══════════ BƯỚC 5: HƯỚNG DẪN ═══════════ -->
   <section class="card">
     <h2><span class="step">5</span> Hướng dẫn nhanh</h2>
+
     <details>
-      <summary>📖 Lấy save từ trình duyệt</summary>
+      <summary>📖 Lấy save từ trình duyệt (web game)</summary>
       <ol>
-        <li>Mở game → <kbd>F12</kbd> → Console.</li>
+        <li>Mở game trên trình duyệt → <kbd>F12</kbd> → tab <b>Console</b>.</li>
         <li>Chạy: <code>copy(localStorage.getItem('xoi_bt_save')||localStorage.getItem('xoi_bt_save_bak'))</code></li>
         <li>Dán vào ô 1 của tool → <b>Giải mã</b>.</li>
-        <li>Sửa → <b>Ký lại</b> → <b>Sao chép save</b>.</li>
+        <li>Sửa → <b>Ký lại (JSON)</b> → <b>Sao chép</b>.</li>
         <li>Về Console game, chạy (thay <code>PASTE</code>):</li>
       </ol>
       <pre class="code">(function(){var v=PASTE;localStorage.setItem('xoi_bt_save',v);localStorage.setItem('xoi_bt_save_bak',v);localStorage.setItem('xoi_fmt','2');location.reload();})()</pre>
     </details>
+
+    <details>
+      <summary>📱 Lấy save từ app native (Android/iOS)</summary>
+      <ol>
+        <li>Mở app Xôi Bà Tám → vào màn hình chính → bấm <b>Sao lưu dữ liệu</b>.</li>
+        <li>Copy <b>mã XBT3...</b> mà app hiển thị.</li>
+        <li>Dán vào ô 1 của tool → <b>Giải mã</b>.</li>
+        <li>Sửa xong → <b>Tạo mã XBT cho app</b> → copy mã mới.</li>
+        <li>Mở app → <b>Khôi phục dữ liệu</b> → dán mã XBT3 mới.</li>
+      </ol>
+    </details>
+
     <details>
       <summary>📂 Kéo thả file</summary>
       <ul>
@@ -140,29 +164,27 @@
         <li>Click vào ô để mở hộp thoại chọn file.</li>
       </ul>
     </details>
-    <details>
-      <summary>🔓 Mở khoá</summary>
-      <ul>
-        <li><b>Mở khoá tất cả</b> — món xôi + nâng cấp + thành tựu + uy tín + rating + xoá nợ trong 1 nút.</li>
-        <li><b>Mở tất cả món xôi</b> — chỉ mở 24 món.</li>
-        <li><b>Max nâng cấp</b> — noi, la, ghe, loa, ti, tra lên cấp 5.</li>
-        <li><b>Full thành tựu</b> — mọi achievement hiện có trong save lên 999.</li>
-        <li>Hoặc tick từng món trong lưới checkbox bên dưới.</li>
-      </ul>
-    </details>
+
     <details>
       <summary>🔐 Vì sao phải “Ký lại”?</summary>
-      <p>Save có <code>h</code> là hash của <code>d</code>. Sửa <code>d</code> mà không tính lại <code>h</code> → game coi save hỏng. Tool copy nguyên hàm hash từ game nên luôn khớp.</p>
+      <p>
+        Save có <code>h</code> là hash của <code>d</code> (hoặc <code>s</code> trong XBT).
+        Sửa nội dung mà không tính lại <code>h</code> → game coi save hỏng.
+        Tool copy nguyên hàm hash từ game nên luôn khớp.
+      </p>
     </details>
+
     <details>
       <summary>❓ Lỗi thường gặp</summary>
       <ul>
-        <li><b>“Chữ ký không khớp”</b> — bấm <b>Ký lại</b>.</li>
-        <li><b>“Số tiền không khớp với sổ thu chi”</b> — game audit tổng <code>sum(ledger[i].net) === money</code>. Phải sửa entry cuối trong ledger khớp với <code>money</code>.</li>
+        <li><b>“Chữ ký không khớp”</b> — bấm <b>Ký lại</b> để tạo save mới.</li>
+        <li><b>“Mã XBT sai checksum”</b> — mã bị cụt khi copy, kiểm tra đã copy đủ ký tự chưa.</li>
         <li><b>Ghi localStorage xong game không đổi</b> — kiểm tra IndexedDB <code>xoi_bt</code> và <code>xoi_fmt='2'</code>.</li>
+        <li><b>App báo “Số tiền không khớp sổ thu chi”</b> — game audit <code>money == sum(ledger.net)</code>. Sửa ledger tương ứng.</li>
       </ul>
     </details>
   </section>
+
 </main>
 
 <footer class="site-footer">
@@ -171,9 +193,13 @@
 
 <div id="toast" class="toast hidden"></div>
 
+<!-- ═══════════ SCRIPT LOAD ORDER ═══════════ -->
 <script src="./src/sig.js"></script>
 <script src="./src/xbt.js"></script>
 <script src="./src/codec.js"></script>
+<script src="./src/dict.js"></script>
+<script src="./src/ui-form.js"></script>
 <script src="./src/app.js"></script>
+<script src="./src/extras.js"></script>
 </body>
 </html>
