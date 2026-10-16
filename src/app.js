@@ -1,4 +1,4 @@
-/* UI & wiring. Phụ thuộc: XoiSig, XoiCodec. */
+/* UI & wiring. Phụ thuộc: XoiSig, XbtCodec, XoiCodec. */
 (function () {
   'use strict';
 
@@ -7,7 +7,7 @@
       document.body.insertAdjacentHTML('afterbegin',
         '<div style="background:#c02323;color:#fff;padding:14px;font:14px/1.5 system-ui">' +
         '❌ Không load được <code>src/codec.js</code>. Kiểm tra đủ 3 file: ' +
-        '<code>src/sig.js</code>, <code>src/codec.js</code>, <code>src/app.js</code>.' +
+        '<code>src/sig.js</code>, <code>src/xbt.js</code>, <code>src/codec.js</code>, <code>src/app.js</code>.' +
         '</div>');
     });
     return;
@@ -15,15 +15,6 @@
 
   const $ = id => document.getElementById(id);
   const C = window.XoiCodec;
-
-  /* ---- Danh sách cố định ---- */
-  const FULL_DISHES = [
-    'doxanh','lac','gac','ladua','xeo','lacam','dauden','nepcam','mit','ga',
-    'san','bap','vo','com','khuc','thit','chuoi','xoai','saurieng','patecha',
-    'trungcut','lapxuong','thapcam','ngusac'
-  ];
-  const UPG_KEYS = ['noi','la','ghe','loa','ti','tra'];
-  const UPG_MAX = 5;
 
   let toastTimer = 0;
   function toast(msg, kind) {
@@ -49,16 +40,6 @@
     catch (e) { throw new Error('State JSON không hợp lệ: ' + e.message); }
     if (!s || typeof s !== 'object') throw new Error('State phải là object.');
     return s;
-  }
-  function loadStateOrWarn() {
-    try { return currentState(); }
-    catch (e) { toast('❌ ' + e.message, 'bad'); return null; }
-  }
-  function saveState(s) {
-    $('state').value = JSON.stringify(s, null, 2);
-    renderPreview(s);
-    refreshQuickEdit(s);
-    buildDishList(s);
   }
 
   function renderPreview(s) {
@@ -104,63 +85,15 @@
         else if (isFinite(n)) s[k] = n;
       }
     }
-    saveState(s);
-  }
-
-  /* ---- Unlock helpers ---- */
-  function unlockDishes(s) {
-    s.unlocked = FULL_DISHES.slice();
-    return s;
-  }
-  function maxUpgrades(s) {
-    s.upg = s.upg || {};
-    for (const k of UPG_KEYS) s.upg[k] = UPG_MAX;
-    return s;
-  }
-  function maxAchievements(s) {
-    s.ach = s.ach || {};
-    for (const k of Object.keys(s.ach)) s.ach[k] = 999;
-    return s;
-  }
-  function unlockEverything(s) {
-    unlockDishes(s);
-    maxUpgrades(s);
-    maxAchievements(s);
-    s.rep = 5;
-    s.app = 5;
-    s.debt = 0;
-    return s;
-  }
-
-  /* ---- Checkbox list món xôi ---- */
-  function buildDishList(s) {
-    const box = $('dishList');
-    if (!box) return;
-    const has = new Set((s && Array.isArray(s.unlocked)) ? s.unlocked : []);
-    box.innerHTML = FULL_DISHES.map(id =>
-      `<label class="dish-item${has.has(id) ? ' on' : ''}">` +
-        `<input type="checkbox" data-dish="${id}"${has.has(id) ? ' checked' : ''}>` +
-        `<span>${id}</span>` +
-      `</label>`
-    ).join('');
-    box.querySelectorAll('input[type=checkbox]').forEach(cb => {
-      cb.addEventListener('change', () => {
-        const st = loadStateOrWarn();
-        if (!st) return;
-        const set = new Set(st.unlocked || []);
-        if (cb.checked) set.add(cb.dataset.dish);
-        else set.delete(cb.dataset.dish);
-        st.unlocked = FULL_DISHES.filter(d => set.has(d));
-        saveState(st);
-      });
-    });
+    $('state').value = JSON.stringify(s, null, 2);
+    renderPreview(s);
   }
 
   async function onDecode() {
     try {
       const r = await C.decodeAny($('input').value);
       $('state').value = JSON.stringify(r.state, null, 2);
-      renderPreview(r.state); refreshQuickEdit(r.state); buildDishList(r.state);
+      renderPreview(r.state); refreshQuickEdit(r.state);
       const when = r.t ? new Date(r.t).toLocaleString('vi-VN') : '(không có t)';
       toast('✅ Giải mã OK (' + r.kind + '). Lưu lúc: ' + when, 'good');
       return true;
@@ -169,6 +102,7 @@
       return false;
     }
   }
+
   function onSign() {
     try {
       const s = currentState();
@@ -176,26 +110,44 @@
       if (typeof s.day !== 'number' || s.day < 1)
         throw new Error('day phải là số >= 1.');
       $('output').value = C.encodeSave(s);
-      toast('✅ Đã ký lại save.', 'good');
+      toast('✅ Đã ký lại save JSON.', 'good');
     } catch (e) { toast('❌ ' + e.message, 'bad'); }
   }
+
+  function onMakeXbt() {
+    try {
+      const s = currentState();
+      if (typeof s.v !== 'number') s.v = 1;
+      if (typeof s.day !== 'number' || s.day < 1)
+        throw new Error('day phải là số >= 1.');
+      $('output').value = C.encodeXbt(s);
+      toast('📱 Đã tạo mã XBT cho app — copy rồi dán vào game.', 'good');
+    } catch (e) { toast('❌ ' + e.message, 'bad'); }
+  }
+
   function onVerify() {
     const raw = ($('output').value || $('input').value || '').trim();
     if (!raw) return toast('Chưa có gì để kiểm tra.', 'bad');
     try { const r = C.decodeSave(raw); toast('✅ Chữ ký hợp lệ. day=' + r.state.day, 'good'); }
     catch (e) { toast('❌ ' + e.message, 'bad'); }
   }
+
   async function onCopySave() {
     const txt = $('output').value;
     if (!txt) return toast('Chưa có save — bấm Ký lại trước.', 'bad');
-    try { await navigator.clipboard.writeText(txt); toast('📋 Đã sao chép save.', 'good'); }
+    try { await navigator.clipboard.writeText(txt); toast('📋 Đã sao chép.', 'good'); }
     catch (e) { $('output').select(); toast('Không tự sao chép được — Ctrl+C.', 'bad'); }
   }
+
   function onDownloadSave() {
     const txt = $('output').value;
     if (!txt) return toast('Chưa có save — bấm Ký lại trước.', 'bad');
     let day = 1;
-    try { const o = JSON.parse(txt); const st = JSON.parse(C.b64d(o.d)); day = st.day || 1; } catch(e){}
+    try {
+      const o = JSON.parse(txt);
+      if (o.d) { const st = JSON.parse(C.b64d(o.d)); day = st.day || 1; }
+      else if (o.state) day = o.state.day || 1;
+    } catch(e){}
     const d = new Date(), p2 = n => String(n).padStart(2,'0');
     const name = 'xoi-ba-tam-ngay-' + day + '-' + d.getFullYear() + p2(d.getMonth()+1) + p2(d.getDate()) + '.json';
     const blob = new Blob([txt], { type:'application/json' });
@@ -205,6 +157,7 @@
     setTimeout(() => URL.revokeObjectURL(url), 4000);
     toast('💾 Đã tải ' + name, 'good');
   }
+
   function onWriteStorage() {
     const txt = $('output').value;
     if (!txt) return toast('Chưa có save — bấm Ký lại trước.', 'bad');
@@ -215,6 +168,7 @@
       toast('💽 Đã ghi localStorage. Reload game để áp dụng.', 'good');
     } catch (e) { toast('❌ Không ghi được localStorage: ' + e.message, 'bad'); }
   }
+
   async function onMakeLink() {
     try {
       const s = currentState();
@@ -224,12 +178,14 @@
       toast('🔗 Đã tạo link chuyển dữ liệu.', 'good');
     } catch (e) { toast('❌ ' + e.message, 'bad'); }
   }
+
   async function onCopyLink() {
     const v = $('linkOut').value;
     if (!v) return toast('Chưa có link.', 'bad');
     try { await navigator.clipboard.writeText(v); toast('📋 Đã sao chép link.', 'good'); }
     catch (e) { $('linkOut').select(); toast('Không tự chép — Ctrl+C.', 'bad'); }
   }
+
   function onLoadStorage() {
     try {
       const v = localStorage.getItem('xoi_bt_save') || localStorage.getItem('xoi_bt_save_bak');
@@ -238,13 +194,14 @@
       toast('📥 Đã nạp save. Bấm Giải mã.', 'good');
     } catch (e) { toast('❌ ' + e.message, 'bad'); }
   }
+
   function onClear() {
     $('input').value = ''; $('state').value = ''; $('output').value = ''; $('linkOut').value = '';
-    renderPreview(null); refreshQuickEdit(null); buildDishList(null);
+    renderPreview(null); refreshQuickEdit(null);
     toast('🧹 Đã xoá hết.', '');
   }
 
-  /* ---- Drop zone / file picker ---- */
+  /* ============ Drop zone / file picker ============ */
   function setupDropZone() {
     const zone = $('dropZone');
     const picker = $('filePicker');
@@ -342,10 +299,11 @@
     }
   }
 
-  /* ---- Bootstrap ---- */
+  /* ============ Bootstrap ============ */
   document.addEventListener('DOMContentLoaded', () => {
     $('btnDecode').addEventListener('click', onDecode);
     $('btnSign').addEventListener('click', onSign);
+    $('btnMakeXbt').addEventListener('click', onMakeXbt);
     $('btnVerify').addEventListener('click', onVerify);
     $('btnCopySave').addEventListener('click', onCopySave);
     $('btnDownloadSave').addEventListener('click', onDownloadSave);
@@ -355,29 +313,6 @@
     $('btnLoadStorage').addEventListener('click', onLoadStorage);
     $('btnClear').addEventListener('click', onClear);
 
-    // Unlock buttons
-    $('btnUnlockDishes').addEventListener('click', () => {
-      const s = loadStateOrWarn(); if (!s) return;
-      unlockDishes(s); saveState(s);
-      toast('🍚 Đã mở tất cả ' + FULL_DISHES.length + ' món xôi.', 'good');
-    });
-    $('btnMaxUpg').addEventListener('click', () => {
-      const s = loadStateOrWarn(); if (!s) return;
-      maxUpgrades(s); saveState(s);
-      toast('⬆️ Đã max nâng cấp (cấp ' + UPG_MAX + ').', 'good');
-    });
-    $('btnMaxAch').addEventListener('click', () => {
-      const s = loadStateOrWarn(); if (!s) return;
-      maxAchievements(s); saveState(s);
-      toast('🏆 Đã full thành tựu.', 'good');
-    });
-    $('btnUnlockAll').addEventListener('click', () => {
-      const s = loadStateOrWarn(); if (!s) return;
-      unlockEverything(s); saveState(s);
-      toast('🔓 Đã mở khoá tất cả — bấm Ký lại để lưu.', 'good');
-    });
-
-    // Quick edit fields
     for (const id of Object.keys(QE)) {
       const el = $(id);
       if (el) el.addEventListener('change', applyQuickEdit);
@@ -388,23 +323,16 @@
     $('state').addEventListener('change', () => {
       try {
         const s = JSON.parse($('state').value);
-        refreshQuickEdit(s); renderPreview(s); buildDishList(s);
+        refreshQuickEdit(s); renderPreview(s);
       } catch (e) { toast('JSON chưa hợp lệ.', 'bad'); }
     });
 
-    $('btnMaxMoney').addEventListener('click', () => {
-      const s = loadStateOrWarn(); if (!s) return;
-      safeSetMoney(s, 999999999);
-      saveState(s);
-      $('qe_money').value = 999999999;
-      toast('💰 Đã set 999.999.999đ và khớp ledger.', 'good');
-    });
+    $('btnMaxMoney').addEventListener('click', () => { $('qe_money').value = 999999999; applyQuickEdit(); });
     $('btnClearDebt').addEventListener('click', () => { $('qe_debt').value = 0; applyQuickEdit(); });
     $('btnMaxRep').addEventListener('click', () => { $('qe_rep').value = 5; applyQuickEdit(); });
 
     setupDropZone();
     renderPreview(null);
     refreshQuickEdit(null);
-    buildDishList(null);
   });
 })();

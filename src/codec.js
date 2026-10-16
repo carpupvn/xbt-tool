@@ -1,9 +1,13 @@
-/* Codec: giải mã / ký lại save, đóng gói token chuyển dữ liệu. */
+/* ============================================================================
+   Codec: giải mã / ký lại save, đóng gói token chuyển dữ liệu.
+   Phụ thuộc: XoiSig (bắt buộc), XbtCodec (tuỳ chọn - để hỗ trợ mã XBT3)
+   ============================================================================ */
 (function (global) {
   'use strict';
   if (!global.XoiSig) return;
   const { sig, b64e, b64d } = global.XoiSig;
 
+  /* ---------- base64url ↔ bytes ---------- */
   function bytesToToken(bytes) {
     let out = ''; const step = 32768;
     for (let i = 0; i < bytes.length; i += step)
@@ -26,6 +30,7 @@
     return decodeURIComponent(escape(atob(s)));
   }
 
+  /* ---------- gzip ---------- */
   async function gzipText(text) {
     if (typeof CompressionStream === 'undefined') throw new Error('no-compression');
     const stream = new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'));
@@ -38,13 +43,13 @@
     return await new Response(stream).text();
   }
 
+  /* ---------- save <-> object ---------- */
   function buildSave(state, t) {
     const json = JSON.stringify(state);
     return { json, d: b64e(json), h: sig(json), t: t || Date.now() };
   }
-    function encodeSave(state, t) {
+  function encodeSave(state, t) {
     const o = buildSave(state, t);
-    // Format khớp với backupText() của game — phải có game/v/day để nút "Khôi phục dữ liệu" chấp nhận
     return JSON.stringify({
       game: 'ai-mua-xoi-di',
       f: 2,
@@ -55,7 +60,6 @@
       h: o.h
     });
   }
-  
   function decodeSave(raw) {
     let o;
     try { o = typeof raw === 'string' ? JSON.parse(raw) : raw; }
@@ -72,6 +76,13 @@
     return { state, t: typeof o.t === 'number' ? o.t : 0 };
   }
 
+  /* ---------- XBT3 ---------- */
+  function encodeXbt(state) {
+    if (!global.XbtCodec) throw new Error('Chưa load xbt.js');
+    return global.XbtCodec.encode(state, sig, 'web-final');
+  }
+
+  /* ---------- transfer token ---------- */
   async function encodeTransfer(state, t) {
     const o = buildSave(state, t);
     const payload = JSON.stringify({ game:'ai-mua-xoi-di', f:2, v:'web-final', day: state.day, t: o.t, d: o.d, h: o.h });
@@ -88,9 +99,18 @@
     return decodeSave(JSON.stringify({ f:2, d:o.d, h:o.h, t:o.t }));
   }
 
+  /* ---------- auto-detect ---------- */
   async function decodeAny(raw) {
     raw = String(raw || '').trim();
     if (!raw) throw new Error('Chưa có dữ liệu để giải mã.');
+
+    // ⚡ Mã XBT3 của app native (Android/iOS)
+    if (raw.indexOf('XBT3') >= 0 && global.XbtCodec) {
+      const r = global.XbtCodec.decode(raw);
+      const json = JSON.stringify(r.state);
+      if (sig(json) !== r.h) throw new Error('Chữ ký XBT không khớp — mã đã bị sửa.');
+      return { state: r.state, t: r.t, kind: 'xbt-app' };
+    }
 
     const m = raw.match(/#?xoi-transfer=([A-Za-z0-9_\-\.]+)/);
     const tok = m ? m[1] : (/^(g\.|r\.)[A-Za-z0-9_\-]+$/.test(raw) ? raw : null);
@@ -123,6 +143,7 @@
     sig, b64e, b64d,
     encodeSave, decodeSave,
     encodeTransfer, decodeTransfer,
+    encodeXbt,
     decodeAny,
   };
 })(window);
